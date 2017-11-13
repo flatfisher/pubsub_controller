@@ -12,12 +12,13 @@ from apps.subscriber.pull.gunicorn_restart import GunicornRestart
 SUBSCRIPTION_NAME = 'projects/' + GCP_PROJECT_ID + '/subscriptions/{unique}'
 
 
-def gunicorn_restart():
+def gunicorn_restart(event):
     """
     メッセージを受け取ってgunicorn restartする。
     *** Subscriberを増やす際はこのようなメソッドを追加し、メインのthreadsにappendする。 ***
+    :param event: threading.Eventオブジェクト
     """
-    GunicornRestart.pull(SUBSCRIPTION_NAME.format(unique='unique_key'))
+    GunicornRestart.pull(event, SUBSCRIPTION_NAME.format(unique='unique_key'))
 
 
 def subscriber_all_close():
@@ -59,8 +60,8 @@ def main():
         threads.append(gunicorn_restart)
 
         for thread in threads:
-            t = threading.Thread(target=thread)
-            t.daemon = True
+            event = threading.Event()
+            t = threading.Thread(target=thread, args=(event, ))
             t.start()
 
         # プロセスを常駐させる

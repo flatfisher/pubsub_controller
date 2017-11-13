@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function, unicode_literals
-
+import time
 from google.cloud import pubsub_v1
 from apps.utils.log import log, error_log
 
 
 class SubscribeBase(object):
 
-    subscription = None
+    event = None
 
     @classmethod
     def received_function(cls, message):
@@ -20,15 +20,16 @@ class SubscribeBase(object):
     @classmethod
     def close(cls):
         """
-        future.result()しているのをcloseして処理終了させる
+        event.wait()しているのを処理終了させる
         """
-        cls.subscription.close()
+        cls.event.set()
 
     @classmethod
-    def pull(cls, subscription_name):
+    def pull(cls, event, subscription_name):
         """
         Pullリクエストを行い、メッセージをSubscribeする。
         callbackメソッドにてメッセージの正常応答と、メッセージに対応した処理を行う。
+        :param event: threading.Eventオブジェクト
         :param subscription_name: "projects/"から始まるSubscription名称
         """
 
@@ -42,22 +43,24 @@ class SubscribeBase(object):
             # メッセージ受信後処理をCall
             cls.received_function(message)
 
-        # Subscriber
-        cls.subscription = subscriber.subscribe(subscription_name)
-        # Open the subscription, passing the callback.
-        future = cls.subscription.open(callback)
-
-        log('Listening for messages on {}'.format(subscription_name))
-
         try:
-            # Publisherのメッセージを待ち受ける(ブロッキングされる)
-            future.result()
+            # Publisherのメッセージを待ち受ける
+            subscriber.subscribe(subscription_name, callback=callback)
+
+            log('Listening for messages on {}'.format(subscription_name))
+
+            # プロセスを常駐させる
+            cls.event = event
+            cls.event.wait()
+
+            # event.set()されたらログを出して終了
             log('Closed for messages on {}'.format(subscription_name))
+
         except KeyboardInterrupt:
             log('Stopped Subscribe on {}'.format(subscription_name))
+            cls.event.set()
             raise
         except Exception as e:
             error_log('subscription error. detail = {}'.format(e))
+            cls.event.set()
             raise
-        finally:
-            cls.subscription.close()
