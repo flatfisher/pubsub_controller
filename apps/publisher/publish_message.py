@@ -9,6 +9,10 @@ from __future__ import (
 import json
 import argparse
 from google.cloud import pubsub_v1
+import os, sys
+# as '../../../'
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
 from apps.utils.log import log
 from settings import GCP_PROJECT_ID
 
